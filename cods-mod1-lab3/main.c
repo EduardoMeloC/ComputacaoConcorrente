@@ -38,9 +38,9 @@ void* pi_thread(void* arg){
     // each thread processes a block of Leibniz Formula's sequence
     long int id = (long int) arg;
     double* sum = (double*) safe_malloc(sizeof(double)); // local block sum
-    long int block_len = g_niterations / g_nthreads;
-    long int start = id * block_len;
-    long int end = (id == g_nthreads-1) ? g_niterations : start + block_len;
+    long long int block_len = g_niterations / g_nthreads;
+    long long int start = id * block_len;
+    long long int end = (id == g_nthreads-1) ? g_niterations : start + block_len;
 
     for (long long int i = start; i < end; i++){
         *sum += 1.0/(i*2 + 1) * (i % 2 == 0 ? 1 : -1);
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]){
     printf("\n-----------------\n");
     printf("\nCOMPARISON AND ANALYSIS\n\n");
     char* str_fastest = (threaded_deltatime < sequential_deltatime) ? "concurrent" : "sequential";
-    char* str_smallesterr = (M_PI - threaded_pi < M_PI - sequential_pi) ? "concurrent" : "sequential";
+    char* str_smallesterr = (threaded_err < sequential_err) ? "concurrent" : "sequential";
     double fastest_time = (threaded_deltatime < sequential_deltatime) ? threaded_deltatime : sequential_deltatime;
     double slowest_time = (threaded_deltatime < sequential_deltatime) ? sequential_deltatime : threaded_deltatime;
     double smallest_err = (threaded_err < sequential_err) ? threaded_err : sequential_err;
