@@ -10,6 +10,9 @@
 #define IMAGE_WIDTH 1280
 #define IMAGE_HEIGHT 720
 
+#define SHADOW_BIAS 1e-4f
+#define MSAA_SAMPLES 16 // samples per pixel for anti-aliasing
+
 #ifdef DEFAULT_SCENE
     // only mess around with these values if you change init_scene
     #define N_SPHERES 11 
@@ -71,26 +74,9 @@ void swap( float* a, float* b ){
     (*a) = (*b);
     (*b) = (*c);
 }
-void vec3f_set(vec3f* u, float x, float y, float z){
-    u->x = x;
-    u->y = y;
-    u->z = z;
-}
-
-vec3f vec3f_random(float min, float max){
-    return (vec3f){ float_rand(min, max), float_rand(min, max), float_rand(min, max) };
-}
 
 float clamp(float v, float min, float max){
     return (v < min) ? min : (v > max) ? max : v;
-}
-
-vec3f vec3f_clamp(vec3f vec, float min, float max){
-    return (vec3f){ clamp(vec.x, min, max), clamp(vec.y, min, max), clamp(vec.z, min, max) };
-}
-
-float dot(vec3f u, vec3f v){
-    return u.x * v.x + u.y * v.y + u.z * v.z;
 }
 
 vec3f sum(vec3f u, vec3f v){
@@ -101,6 +87,10 @@ vec3f sum(vec3f u, vec3f v){
 vec3f sub(vec3f u, vec3f v){
     vec3f w = {u.x - v.x, u.y - v.y, u.z - v.z};
     return w;
+}
+
+float  dot(vec3f u, vec3f v){
+    return u.x * v.x + u.y * v.y + u.z * v.z;
 }
 
 vec2f vec2f_sub(vec2f u, vec2f v){
@@ -127,6 +117,29 @@ vec2f vec2f_div_vec2f(vec2f u, vec2f v){
     vec2f w = {u.x/v.x, u.y/v.y};
     return w;
 }
+
+void vec3f_set(vec3f* u, float x, float y, float z){
+    u->x = x;
+    u->y = y;
+    u->z = z;
+}
+
+vec3f vec3f_clamp(vec3f vec, float min, float max){
+    return (vec3f){ clamp(vec.x, min, max), clamp(vec.y, min, max), clamp(vec.z, min, max) };
+}
+
+vec3f vec3f_random(float min, float max){
+    return (vec3f){ float_rand(min, max), float_rand(min, max), float_rand(min, max) };
+}
+
+vec3f vec3f_reflect(vec3f dir, vec3f normal){
+    return sub(mul(normal, dot(dir, normal)*2.f), dir);;
+}
+
+vec3f vec3f_mul_vec3f(vec3f u, vec3f v){
+    return (vec3f) {u.x * v.x, u.y * v.y, u.z * v.z};
+}
+
 
 float length(vec3f u){
     return sqrt(u.x*u.x + u.y*u.y + u.z*u.z);
@@ -175,7 +188,9 @@ bool raycast(Ray* ray, Sphere* sphere, RayHit* hit){
     float x = sqrt(r*r - y*y);
     float t1 = t-x;
     float t2 = t+x;
-    if (t1 > t2) swap(&t1, &t2);
+    if (t1 > t2){ 
+        swap(&t1, &t2);
+    }
     if (t1 < 0) {
         t1 = t2;
         if (t1 < 0) return false;
@@ -203,60 +218,105 @@ void mainImage( vec3f* fragColor, vec2f fragCoord, ShaderInput* data ){
 
     // centering uv coordinates
     vec2f uv = vec2f_div(vec2f_sub(fragCoord, vec2f_div(iResolution, 2.0f)), iResolution.y);
+    vec2f pixel_size = (vec2f){ 2.f/iResolution.x, 1.f/iResolution.y };
     vec3f color = { 0.0f, 0.0f, 0.0f };
 
-    // create a ray for the current pixel
-    vec3f ro = { 0.0f, 0.0f, -100.0f };
-    vec3f rd = { uv.x, uv.y, 1.0f };
-    rd = normalize(rd);
-    Ray ray = { ro, rd };
+    // make samples per pixel for anti-aliasing with 2x2 grid
+    vec3f MSAA_samples[MSAA_SAMPLES];
+    float sq_samples = sqrt(MSAA_SAMPLES);
+    vec2f subpix_len = (vec2f){ pixel_size.x / sq_samples, pixel_size.y / sq_samples };
+    for(int sample = 0; sample < MSAA_SAMPLES; sample++){ 
+        vec2f MSAA_offset = { 
+            fmod(sample * subpix_len.x, pixel_size.x) + subpix_len.x/2,
+            floor(sample * subpix_len.x / pixel_size.x) * subpix_len.y + subpix_len.y/2
+        };
+            /* pixel_size.x / sq_samples / 2. * sample + (pixel_size.x / sq_samples) / 4., */
+            /* (pixel_size.x / sq_samples / 2. * sample + (pixel_size.x / sq_samples) / 4.) / pixel_size.x * pixel_size.y / 2. + (pixel_size.y / sq_samples) /4. }; */
 
-    RayHit hit = rayhit_infinity;
-    // iterate for each object in the scene
-    for (int i = 0; i < N_SPHERES; i++){
-        // check if ray intersects with object
-        RayHit closestHit;
-        bool is_hit = raycast(&ray, &iScene->spheres[i], &closestHit);
-        if( is_hit ){
-            if(closestHit.distance < hit.distance){
-                hit = closestHit;
+
+        // create a ray for the current pixel
+        vec3f ro = { 0.0f , 0.0f, -70.0f };
+        vec3f rd = { uv.x + MSAA_offset.x, uv.y + MSAA_offset.y, 1.0f }; 
+        rd = normalize(rd);
+        Ray ray = { ro, rd };
+
+        RayHit hit = rayhit_infinity;
+        // iterate for each object in the scene
+        for (int i = 0; i < N_SPHERES; i++){
+            // check if ray intersects with object
+            RayHit closestHit;
+            bool is_hit = raycast(&ray, &iScene->spheres[i], &closestHit);
+            if( is_hit ){
+                if(closestHit.distance < hit.distance){
+                    hit = closestHit;
+                }
             }
         }
-    }
-    Sphere* hitObject = hit.hitObject;
+        Sphere* hitObject = hit.hitObject;
 
-    // render a sphere in the point light's position
-    for (int i = 0; i < N_LIGHTS; i++){
-        Light light = iScene->lights[i];
-        RayHit hit;
-        bool is_hit = raycast(&ray, &(Sphere){ light.pos, light.color, 0.5 }, &hit);
-        if(is_hit){
-            (*fragColor) = light.color;
-            return;
+        // render a sphere in the point light's position
+        bool is_light_hit;
+        for (int i = 0; i < N_LIGHTS; i++){
+            Light light = iScene->lights[i];
+            RayHit hit;
+            is_light_hit = raycast(&ray, &(Sphere){ light.pos, light.color, 0.5 }, &hit);
+            if (is_light_hit) {
+                color = light.color;
+                break;
+            }
         }
+        if(is_light_hit){
+            MSAA_samples[sample] = color;
+            continue;
+        }
+
+        // if there was no hit, return background color
+        if (hit.distance == MAX_DIST){
+            MSAA_samples[sample] = (vec3f){ 0., 0., 0. };
+            continue;
+        }
+
+        vec3f diffuse  = (vec3f){0., 0., 0.};
+        vec3f specular = (vec3f){0., 0., 0.};
+        for (int i=0; i < N_LIGHTS; i++){
+            Light light = iScene->lights[i];
+            vec3f light_dir = sub(light.pos, hit.point);
+            float r2 = length(light_dir);
+            light_dir = normalize(light_dir);
+
+            // cast hard shadow
+            float shadow_value = 1.;
+            vec3f shadow_ro = sum(hit.point, mul(hit.normal, SHADOW_BIAS));
+            vec3f shadow_rd = mul(light_dir, 1);
+            Ray shadow_ray = (Ray) {shadow_ro, shadow_rd};
+            RayHit shadow_hit;
+            for (int i = 0; i < N_SPHERES-1; i++){
+                bool is_hit = raycast(&shadow_ray, &iScene->spheres[i], &shadow_hit);
+                if(shadow_hit.distance > length(sub(light.pos, shadow_ray.origin))) continue;
+                if (is_hit){
+                    shadow_value = 0.;
+                }
+            }
+
+            // calculate diffuse
+            vec3f light_intensity = mul(light.color, light.intensity / (4 * M_PI * r2)); // controlling decay
+            float light_value = max(dot(light_dir, hit.normal), 0.f);
+            diffuse = sum(diffuse, mul(vec3f_mul_vec3f(hitObject->albedo, light_intensity), light_value * shadow_value ));
+
+            // calculate specular (Phong)
+            vec3f R = vec3f_reflect(light_dir, hit.normal);
+            specular = sum(specular, mul(light_intensity, shadow_value * pow(max(0.f, dot(R, mul(rd, -1))), 150)));
+
+
+        }
+        MSAA_samples[sample] = sum(mul(diffuse, 0.8f), mul(specular, 0.3f));
     }
 
-    // if there was no hit, return background color
-    if (hit.distance == MAX_DIST){
-        (*fragColor) = (vec3f){ 0., 0., 0. };
-        return;
+    for(int i=0; i < MSAA_SAMPLES; i++){
+        /* printf("%.2f, %.2f, %.2f\n", MSAA_samples[i].x, MSAA_samples[i].y, MSAA_samples[i].z); */
+        color = sum(color, MSAA_samples[i]);
     }
-
-    // calculate diffuse
-    for (int i=0; i < N_LIGHTS; i++){
-        Light light = iScene->lights[i];
-        vec3f lightDir = sub(light.pos, hit.point);
-        float r2 = length(lightDir);
-        lightDir = normalize(lightDir);
-        float lightIntensity = light.intensity / (4 * M_PI * r2);
-        float light_value = max(dot(lightDir, hit.normal), 0.f);
-
-        color.x += hitObject->albedo.x * light.color.x * light_value * lightIntensity / M_PI;
-        color.y += hitObject->albedo.y * light.color.y * light_value * lightIntensity / M_PI;
-        color.z += hitObject->albedo.z * light.color.z * light_value * lightIntensity / M_PI;
-        if(color.z > 1.0) printf("%.2f\n", color.z);
-    }
-    /* color = hit.hitObject->albedo; */
+    color = mul(color, 1./MSAA_SAMPLES);
         
 
     (*fragColor) = vec3f_clamp(color, 0.0f, 1.0f);
@@ -267,16 +327,16 @@ Scene* init_scene(){
     Light* lights = (Light*) safe_malloc(N_LIGHTS * sizeof(Light));
     lights[0].pos       = (vec3f){ -20., 20., -50. };
     lights[0].color     = (vec3f){ 1., 0., 1. };
-    lights[0].intensity = 430.;
+    lights[0].intensity = 135.;
     lights[1].pos       = (vec3f){ 20., 20., -50. };
     lights[1].color     = (vec3f){ 0., 1., 1. };
-    lights[1].intensity = 430.;
+    lights[1].intensity = 135.;
     lights[2].pos       = (vec3f){ 0., 20., -20*sqrt(3) };
     lights[2].color     = (vec3f){ 1., 1., 0.8 };
-    lights[2].intensity = 210.;
+    lights[2].intensity = 165.;
 
     Sphere* spheres = (Sphere*) safe_malloc(N_SPHERES * sizeof(Sphere));
-    for(int i=0; i < 10; i++){
+    for(int i=1; i < 10; i++){
         spheres[i].pos = (vec3f){ 30 * cos(M_PI / 10 * i), 0, 30 * sin(M_PI / 10 * i) - 45 };
         spheres[i].albedo = vec3f_random(0., 1.);
         spheres[i].radius = 5;
