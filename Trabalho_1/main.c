@@ -313,7 +313,6 @@ void mainImage( vec3f* fragColor, vec2f fragCoord, ShaderInput* data ){
     }
 
     for(int i=0; i < MSAA_SAMPLES; i++){
-        /* printf("%.2f, %.2f, %.2f\n", MSAA_samples[i].x, MSAA_samples[i].y, MSAA_samples[i].z); */
         color = sum(color, MSAA_samples[i]);
     }
     color = mul(color, 1./MSAA_SAMPLES);
@@ -359,21 +358,61 @@ void free_scene(Scene* scene){
     free(scene);
 }
 
+// global inputs
+int g_nthreads;
+int g_nsamples;
+
+// global shared memory between threads
+ShaderInput g_shaderInput;
+vec3f* g_frameBuffer;
+
+void* thread_fill_framebuffer(void* args){
+    long int id = (long int) args;
+    
+    for (long int i = id; i < IMAGE_WIDTH * IMAGE_HEIGHT; i += g_nthreads){
+        int y = i / IMAGE_WIDTH;
+        int x = i - (y * IMAGE_WIDTH);
+        vec2f fragCoord = { x, IMAGE_HEIGHT - y };
+        mainImage( g_frameBuffer+i, fragCoord, &g_shaderInput );
+    }
+    pthread_exit(NULL);
+}
+
 int main(int argc, char* argv[]){
-    /* Intializes random number generator */
+    // Receive argv inputs 
+    if (argc < 2){
+        fprintf(stderr, "Usage: %s [N_THREADS] [N_SAMPLES]\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    g_nthreads = atoi(argv[1]);
+    g_nsamples = atoi(argv[2]);
+
+    // Intialize random number generator
     srand((unsigned int)time(NULL));
 
-    // allocate memory and initialize variables
-    vec3f* frame_buffer = (vec3f*) safe_malloc(IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(vec3f));
+    // Allocate memory and initialize variables
     Scene* scene = init_scene();
     vec2f resolution = { IMAGE_WIDTH, IMAGE_HEIGHT };
-    ShaderInput shader_input = { scene, resolution };
+    g_shaderInput = (ShaderInput){ scene, resolution };
+    g_frameBuffer = (vec3f*) safe_malloc(IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(vec3f));
 
-    // iterate for each pixel
-    for (int y=0; y < IMAGE_HEIGHT; y++){
-        for (int x=0; x < IMAGE_WIDTH; x++){
-            vec2f fragCoord = { x, IMAGE_HEIGHT-y };
-            mainImage( &frame_buffer[y * IMAGE_WIDTH + x], fragCoord, &shader_input );
+    // Sequential version
+    if (g_nthreads == 0){
+        for (int y=0; y < IMAGE_HEIGHT; y++){
+            for (int x=0; x < IMAGE_WIDTH; x++){
+                vec2f fragCoord = { x, IMAGE_HEIGHT-y };
+                mainImage( &g_frameBuffer[y * IMAGE_WIDTH + x], fragCoord, &g_shaderInput );
+            }
+        }
+    }
+    // Multi threaded version
+    else{
+        pthread_t threads[g_nthreads];
+        for (long int i = 0; i < g_nthreads; i++){
+            safe_pthread_create(&threads[i], NULL, thread_fill_framebuffer, (void *) i);
+        }
+        for (int i = 0; i < g_nthreads; i++){
+            safe_pthread_join(threads[i], NULL);
         }
     }
     
@@ -388,7 +427,7 @@ int main(int argc, char* argv[]){
     fprintf(output_image, "%d %d 255\n", IMAGE_WIDTH, IMAGE_HEIGHT);
     for (int y=0; y < IMAGE_HEIGHT; y++){
         for (int x=0; x < IMAGE_WIDTH; x++){
-            vec3f pixel = frame_buffer[y * IMAGE_WIDTH + x];
+            vec3f pixel = g_frameBuffer[y * IMAGE_WIDTH + x];
             color_t c = vec3f_to_color(pixel);
             fputc(c.r, output_image);
             fputc(c.g, output_image);
@@ -396,7 +435,7 @@ int main(int argc, char* argv[]){
         }    
     }
     fclose(output_image);
-    free(frame_buffer);
     free_scene(scene);
+    free(g_frameBuffer);
     exit(EXIT_SUCCESS);
 }
