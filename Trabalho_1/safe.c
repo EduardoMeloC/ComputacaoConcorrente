@@ -1,5 +1,6 @@
+#include "safe.h"
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <pthread.h>
 
 void* safe_malloc(size_t size){
