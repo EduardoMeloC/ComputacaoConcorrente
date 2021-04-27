@@ -44,6 +44,7 @@ void mainImage( vec3f* fragColor, vec2f fragCoord, ShaderInput* data ){
     // renaming shdader input for easier handling
     Scene* iScene = data->iScene;
     vec2f iResolution = data->iResolution;
+    int iNsamples = data->iNsamples;
 
     // centering uv coordinates
     vec2f uv = vec2f_div(vec2f_sub(fragCoord, vec2f_div(iResolution, 2.0f)), iResolution.y);
@@ -51,10 +52,10 @@ void mainImage( vec3f* fragColor, vec2f fragCoord, ShaderInput* data ){
     vec3f color = { 0.0f, 0.0f, 0.0f };
 
     // make samples per pixel for anti-aliasing with sqrt(samples) x sqrt(samples) grid
-    vec3f MSAA_samples[MSAA_SAMPLES];
-    float sq_samples = sqrt(MSAA_SAMPLES);
+    vec3f MSAA_samples[iNsamples];
+    float sq_samples = sqrt(iNsamples);
     vec2f subpix_len = (vec2f){ pixel_size.x / sq_samples, pixel_size.y / sq_samples };
-    for(int sample = 0; sample < MSAA_SAMPLES; sample++){ 
+    for(int sample = 0; sample < iNsamples; sample++){ 
         vec2f MSAA_offset = { 
             fmod(sample * subpix_len.x, pixel_size.x) + subpix_len.x/2,
             floor(sample * subpix_len.x / pixel_size.x) * subpix_len.y + subpix_len.y/2
@@ -138,10 +139,10 @@ void mainImage( vec3f* fragColor, vec2f fragCoord, ShaderInput* data ){
         MSAA_samples[sample] = sum(mul(diffuse, 0.8f), mul(specular, 0.3f));
     }
 
-    for(int i=0; i < MSAA_SAMPLES; i++){
+    for(int i=0; i < iNsamples; i++){
         color = sum(color, MSAA_samples[i]);
     }
-    color = mul(color, 1./MSAA_SAMPLES);
+    color = mul(color, 1./iNsamples);
 
 
     (*fragColor) = vec3f_clamp(color, 0.0f, 1.0f);

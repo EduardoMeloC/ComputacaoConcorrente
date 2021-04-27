@@ -2,24 +2,23 @@
 #include <stdlib.h>
 #include <math.h>
 #include <pthread.h>
-#include "vec.h"
 #include "safe.h"
+#include "timer.h"
+#include "vec.h"
+#include "raycast.h"
 #include "constants.h"
 #include "utils.h"
-#include "raycast.h"
-
-// global inputs
-int g_nthreads;
-int g_nsamples;
 
 // global shared memory between threads
 ShaderInput g_shaderInput;
 vec3f* g_frameBuffer;
 
+// global input
+int g_nthreads;
+
 // function prototypes
 Scene* initScene();
 void free_scene(Scene* scene);
-
 
 void* thread_fill_framebuffer(void* args){
     long int id = (long int) args;
@@ -34,13 +33,19 @@ void* thread_fill_framebuffer(void* args){
 }
 
 int main(int argc, char* argv[]){
+    // Declare timing variables
+    double timer_start, timer_end;
+    double fill_dt = 0, write_dt = 0, others_dt = 0;
+
+    GET_TIME(timer_start);
+
     // Receive argv inputs 
     if (argc < 2){
         fprintf(stderr, "Usage: %s [N_THREADS] [N_SAMPLES]\n", argv[0]);
         exit(EXIT_FAILURE);
     }
     g_nthreads = atoi(argv[1]);
-    g_nsamples = atoi(argv[2]);
+    int nsamples = atoi(argv[2]);
 
     // Intialize random number generator
     srand((unsigned int)time(NULL));
@@ -48,8 +53,12 @@ int main(int argc, char* argv[]){
     // Allocate memory and initialize variables
     Scene* scene = initScene();
     vec2f resolution = { IMAGE_WIDTH, IMAGE_HEIGHT };
-    g_shaderInput = (ShaderInput){ scene, resolution };
+    g_shaderInput = (ShaderInput){ scene, resolution, nsamples };
     g_frameBuffer = (vec3f*) safe_malloc(IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(vec3f));
+
+    GET_TIME(timer_end);
+    others_dt += timer_end - timer_start;
+    GET_TIME(timer_start);
 
     // Sequential version
     if (g_nthreads == 0){
@@ -70,6 +79,10 @@ int main(int argc, char* argv[]){
             safe_pthread_join(threads[i], NULL);
         }
     }
+
+    GET_TIME(timer_end);
+    fill_dt += timer_end - timer_start;
+    GET_TIME(timer_start);
     
     // output frame_buffer
     FILE *output_image;
@@ -89,9 +102,25 @@ int main(int argc, char* argv[]){
             fputc(c.b, output_image);
         }    
     }
+
+    GET_TIME(timer_end);
+    write_dt += timer_end - timer_start;
+    GET_TIME(timer_start);
+    
+    // free resources
     fclose(output_image);
     free_scene(scene);
     free(g_frameBuffer);
+
+    GET_TIME(timer_end);
+    others_dt += timer_end - timer_start;
+
+    // output execution time:
+    printf("fill execution time:\t %.2fs\n", fill_dt);
+    printf("write execution time:\t %.2fs\n", write_dt);
+    printf("others execution time:\t %.2fs\n", others_dt);
+    printf("total execution time:\t %.2fs\n", fill_dt + write_dt + others_dt);;
+
     exit(EXIT_SUCCESS);
 }
 
@@ -113,7 +142,7 @@ Scene* initScene(){
         spheres[i].albedo = vec3f_random(0., 1.);
         spheres[i].radius = 5;
     }
-    // add ground (sorry earth is not flat)
+    // add ground (which isn't flat, by the way)
     spheres[10].radius = 20000;
     spheres[10].albedo = (vec3f){1., 1., 1.};
     spheres[10].pos = (vec3f){ spheres[5].pos.x, -spheres[10].radius - spheres[5].radius, spheres[5].pos.z };

@@ -40,6 +40,7 @@ typedef struct{
 typedef struct {
     Scene* iScene;
     vec2f iResolution;
+    int iNsamples;
 }ShaderInput;
 
 bool raycast(Ray* ray, Sphere* sphere, RayHit* hit);
