@@ -20,9 +20,11 @@ int g_nthreads;
 Scene* initScene();
 void free_scene(Scene* scene);
 
+// function executed by thread
 void* thread_fill_framebuffer(void* args){
     long int id = (long int) args;
     
+    // iterate through the framebuffer calling the render function
     for (long int i = id; i < IMAGE_WIDTH * IMAGE_HEIGHT; i += g_nthreads){
         int y = i / IMAGE_WIDTH;
         int x = i - (y * IMAGE_WIDTH);
@@ -84,7 +86,7 @@ int main(int argc, char* argv[]){
     fill_dt += timer_end - timer_start;
     GET_TIME(timer_start);
     
-    // output frame_buffer
+    // output frame_buffer to a file
     FILE *output_image;
     output_image = fopen("output_image.ppm", "w");
     if (output_image == NULL){
@@ -124,6 +126,7 @@ int main(int argc, char* argv[]){
     exit(EXIT_SUCCESS);
 }
 
+// create spheres and lights
 Scene* initScene(){
     Light* lights = (Light*) safe_malloc(N_LIGHTS * sizeof(Light));
     lights[0].pos       = (vec3f){ -20., 20., -50. };
@@ -153,6 +156,7 @@ Scene* initScene(){
     return scene;
 }
 
+// free scene resources
 void free_scene(Scene* scene){
     free(scene->lights);
     free(scene->spheres);
