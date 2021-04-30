@@ -2,11 +2,6 @@
 /* Módulo 2 - Laboratório: 4 */
 /* Aluno.: Eduardo Melo */
 /* Código: Imprimir em T4 antes de T2 e T3. A ordem de T2 e T3 não importa. T2 e T3 imprimem antes de T1 */
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <string.h>
 
 /*
  * Comentários:
@@ -14,6 +9,11 @@
  *      > Eu quis brincar com ponteiro de função pra fazer um for que chama as threads, lá na main.
  *      > No lugar de colocar um for pra "gastar tempo", tal qual foi feito nos exemplos, eu escolhi dar um shuffle nesse vetor de ponteiros de função. Dessa forma, a ordem de execução das threads é menos previsível.
 */      
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
 
 unsigned x = 0;
 pthread_mutex_t x_mutex;
