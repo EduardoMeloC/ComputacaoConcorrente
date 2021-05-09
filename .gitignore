@@ -28,6 +28,9 @@
 *.so.*
 *.dylib
 
+# Compiled class file (Java)
+*.class
+
 # Executables
 *.exe
 *.out

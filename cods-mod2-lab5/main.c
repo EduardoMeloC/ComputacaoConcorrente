@@ -1,6 +1,6 @@
 /* Disciplina: Computacao Concorrente */
 /* Prof.: Silvana Rossetto */
-/* Módulo 1 - Laboratório: 1 */
+/* Módulo 2 - Laboratório: 5 */
 /* Codigo: Somas parciais em cada posicao de um vetor */
 /* Exemplo: 
  *      Entrada: [1, 4, -1, 7]
