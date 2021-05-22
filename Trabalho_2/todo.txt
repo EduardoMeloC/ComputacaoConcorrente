@@ -17,7 +17,7 @@
 [x] Calcular a temperatura média de todas leituras disponíveis e exibir na tela.
 
     Aplicação
-[ ] Executar por tempo indeterminado
+[x] Executar por tempo indeterminado
 [x] Quantidade de sensores deve ser passada como argumento
 
 

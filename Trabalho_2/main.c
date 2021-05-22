@@ -76,10 +76,12 @@ void Sensor_write(Sensor* sensor, float temperature){
 
 void* Sensor_thread(void* sensor)
 {
+    static int count = 0;
     Sensor *this = (Sensor *) sensor; // Syntax Sugar
     *this->rand_state = get_rand_state();
 
-    while(1){
+    while(count < 30){
+        count++;
         // Medir Temperatura
         float temperature = Sensor_get_temperature(this);
         // Se a temperatura for maior do que 30, escreve no buffer
@@ -89,9 +91,10 @@ void* Sensor_thread(void* sensor)
             Sensor_write(this, temperature); 
             RnWriter_release_write(this->rnwriter);
         }
-        /* if(this->id == 1) LogBuffer_print(this->log_buffer); */
+        if(this->id == 1) LogBuffer_print(this->log_buffer);
         sleep(1);
     }
+    pthread_exit(NULL);
 }
 
 /* Atuador funciona como leitor */
@@ -179,16 +182,58 @@ void Actuator_read(Actuator* actuator)
 
 void* Actuator_thread(void* actuator)
 {
+    static int count = 0;
     Actuator *this = (Actuator *) actuator; // Syntax Sugar
 
-    while(1){
+    while(count < 30){
+        count++;
         RnWriter_request_read(this->rnwriter);
         Actuator_read(this);
         RnWriter_release_read(this->rnwriter);
         sleep(2);
     }
+    pthread_exit(NULL);
 }
 
+void LogBuffer_init(LogBuffer* log_buffer, int bufflen){
+    LogBuffer *this = log_buffer; // Syntax Sugar
+    this->buffer = (SensorLog*) safe_malloc(bufflen * sizeof(SensorLog));
+    this->length = bufflen;
+}
+
+void LogBuffer_destroy(LogBuffer* log_buffer){
+    LogBuffer *this = log_buffer; // Syntax Sugar
+    free(this->buffer);
+    free(this);
+}
+
+void Sensor_init(Sensor* sensor, RnWriter* rnwriter, LogBuffer* log_buffer){
+    static int id = 1;
+    Sensor *this = sensor; // Syntax Sugar
+
+    this->rand_state = (unsigned int*) safe_malloc(sizeof(unsigned int));
+    this->rnwriter = rnwriter;
+    this->log_buffer = log_buffer;
+    this->id = id++;
+}
+
+void Sensor_destroy(Sensor* sensor){
+    Sensor *this = sensor; // Syntax Sugar
+    free(this->rand_state);
+}
+
+void Actuator_init(Actuator* actuator, RnWriter* rnwriter, LogBuffer* log_buffer){
+    static int id = 1;
+    Actuator *this = actuator; // Syntax Sugar
+
+    this->rnwriter = rnwriter;
+    this->log_buffer = log_buffer;
+    this->id = id++;
+}
+
+void Actuator_destroy(Actuator* actuator){
+    /* nothing to free */
+}
 
 int main(int argc, char* argv[])
 {
@@ -202,28 +247,21 @@ int main(int argc, char* argv[])
 
     /* Alocando Memória e Inicializando Estruturas */
     pthread_t sensor_tids[nsensors], actuator_tids[nsensors];
+    Sensor sensors[nsensors]; Actuator actuators[nsensors];
     RnWriter* rnwriter;
-    Sensor* sensors;
-    Actuator* actuators;
     LogBuffer* log_buffer;
 
     rnwriter = (RnWriter*) safe_malloc(sizeof(RnWriter));
     RnWriter_init(rnwriter);
-    sensors = (Sensor*) safe_malloc(nsensors * sizeof(Sensor));
-    actuators = (Actuator*) safe_malloc(nsensors * sizeof(Actuator));
     log_buffer = (LogBuffer*) safe_malloc(sizeof(LogBuffer));
-    log_buffer->buffer = (SensorLog*) safe_malloc(bufflen * sizeof(SensorLog));
-    log_buffer->length = bufflen;
+    LogBuffer_init(log_buffer, bufflen);
+    for(int i = 0; i < nsensors; i++){
+        Sensor_init(&sensors[i], rnwriter, log_buffer);
+        Actuator_init(&actuators[i], rnwriter, log_buffer);
+    }
 
     /* Criando Threads */
     for(int i = 0; i < nsensors; i++){
-        sensors[i].rand_state = (unsigned int*) safe_malloc(sizeof(unsigned int));
-        sensors[i].rnwriter = rnwriter;
-        sensors[i].log_buffer = log_buffer;
-        sensors[i].id = i+1;
-        actuators[i].rnwriter = rnwriter;
-        actuators[i].log_buffer = log_buffer;
-        actuators[i].id = i+1;
         safe_pthread_create(&sensor_tids[i], NULL, Sensor_thread, (void *)&sensors[i]);
         safe_pthread_create(&actuator_tids[i], NULL, Actuator_thread, (void*)&actuators[i]);
     }
@@ -231,14 +269,16 @@ int main(int argc, char* argv[])
     /* Esperando Threads Terminarem (para o programa rodar indefinidamente) */
     for(int i = 0; i < nsensors; i++){
         safe_pthread_join(sensor_tids[i], NULL);
+        safe_pthread_join(actuator_tids[i], NULL);
     }
 
     /* Liberando Recursos */
     RnWriter_destroy(rnwriter);
-    free(rnwriter);
-    free(sensors);
-    free(log_buffer->buffer);
-    free(log_buffer);
+    LogBuffer_destroy(log_buffer);
+    for(int i = 0; i < nsensors; i++){
+        Sensor_destroy(&sensors[i]);
+        Actuator_destroy(&actuators[i]);
+    }
 
     exit(EXIT_SUCCESS);
 }

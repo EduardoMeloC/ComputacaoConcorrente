@@ -10,6 +10,7 @@
 #define RNWRITER_H
 
 #include <pthread.h>
+#include "safe.h"
 
 typedef struct RnWriter_t
 {

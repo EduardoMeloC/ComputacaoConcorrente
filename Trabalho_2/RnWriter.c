@@ -10,7 +10,7 @@
 
 /* Initializes synchronization variables */
 void RnWriter_init(RnWriter *rnwriter)
-{
+{ 
     pthread_mutex_init(&rnwriter->_mutex, NULL);
     pthread_cond_init(&rnwriter->_cond_read, NULL);
     pthread_cond_init(&rnwriter->_cond_write, NULL);
@@ -23,9 +23,12 @@ void RnWriter_init(RnWriter *rnwriter)
 /* Destroys synchronization variables */
 void RnWriter_destroy(RnWriter *rnwriter)
 {
+    RnWriter *this = rnwriter; // Syntax Sugar
+
     pthread_mutex_destroy(&rnwriter->_mutex);
     pthread_cond_destroy(&rnwriter->_cond_read);
     pthread_cond_destroy(&rnwriter->_cond_write);
+    free(this);
 }
 
 /* Begins Reading */
