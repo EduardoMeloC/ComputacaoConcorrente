@@ -1,0 +1,126 @@
+/*
+ * RnWriter.h
+ *
+ * Este arquivo define uma interface para o problema de Leitores e
+ * Escritores com prioridade para escrita.
+ *
+ */ 
+
+#ifndef RNWRITER_H
+#define RNWRITER_H
+
+#include<pthread.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+
+typedef struct RnWriter_t
+{
+    unsigned int nReadering;      // number of threads reading data 
+    unsigned int nWritering;      // number of threads writing data 
+    unsigned int nRequestedWrite; // number of threads that requested to write
+} RnWriter;
+
+#define L 2 //numero de threads leitoras
+#define E 2 //numero de threads escritoras
+
+//variaveis do problema
+int nReading = 0; //contador de threads lendo
+int nWriting = 0; //contador de threads escrevendo
+int nRequestedWrite = 0; // contador de threads que querem escrever
+
+//variaveis para sincronizacao
+pthread_mutex_t mutex;
+pthread_cond_t cond_leit, cond_escr;
+
+//entrada leitura
+void InicLeit () {
+   pthread_mutex_lock(&mutex);
+   while(nWriting > 0 || nRequestedWrite > 0) {
+        pthread_cond_wait(&cond_leit, &mutex);
+   }
+   nReading++;
+   pthread_mutex_unlock(&mutex);
+}
+
+//saida leitura
+void FimLeit () {
+   pthread_mutex_lock(&mutex);
+   nReading--;
+   if(nReading==0) pthread_cond_signal(&cond_escr);
+   pthread_mutex_unlock(&mutex);
+}
+
+//entrada escrita
+void InicEscr () {
+   pthread_mutex_lock(&mutex);
+   nRequestedWrite++;
+   while((nReading>0) || (nWriting>0)) {
+        pthread_cond_wait(&cond_escr, &mutex);
+   }
+   nRequestedWrite--;
+   nWriting++;
+   pthread_mutex_unlock(&mutex);
+}
+
+//saida escrita
+void FimEscr () {
+   pthread_mutex_lock(&mutex);
+   nWriting--;
+   pthread_cond_signal(&cond_escr);
+   pthread_cond_broadcast(&cond_leit);
+   pthread_mutex_unlock(&mutex);
+}
+
+//thread leitora
+void * leitor (void * arg) {
+  int *id = (int *) arg;
+  while(1) {
+    InicLeit();
+    FimLeit();
+    /* sleep(1); */
+  } 
+  free(arg);
+  pthread_exit(NULL);
+}
+
+//thread leitora
+void * escritor (void * arg) {
+  int *id = (int *) arg;
+  while(1) {
+    InicEscr();
+    FimEscr();
+    sleep(1);
+  } 
+  free(arg);
+  pthread_exit(NULL);
+}
+
+//funcao principal
+int main(void) {
+  //identificadores das threads
+  pthread_t tid[L+E];
+  int id[L+E];
+
+  //inicializa as variaveis de sincronizacao
+  pthread_mutex_init(&mutex, NULL);
+  pthread_cond_init(&cond_leit, NULL);
+  pthread_cond_init(&cond_escr, NULL);
+
+  //cria as threads leitoras
+  for(int i=0; i<L; i++) {
+    id[i] = i+1;
+    if(pthread_create(&tid[i], NULL, leitor, (void *) &id[i])) exit(-1);
+  } 
+  
+  //cria as threads escritoras
+  for(int i=0; i<E; i++) {
+    id[i+L] = i+1;
+    if(pthread_create(&tid[i+L], NULL, escritor, (void *) &id[i+L])) exit(-1);
+  } 
+
+  pthread_exit(NULL);
+  return 0;
+}
+
+#endif

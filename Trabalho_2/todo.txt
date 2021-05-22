@@ -1,0 +1,23 @@
+    TAD
+[x] Implementação de leitor/escritor com prioridade para escrita
+[ ] Teste para avaliar a corretude
+
+    Sensores
+[x] Criar função de medir temperatura gerando número aleatório entre [25, 40]
+[x] Medir temperatura a cada 1 segundo com sleep
+[x] Se a temperatura medida for maior que 30, escrever no buffer
+[x] Na escrita do buffer, deve-se ter: (temperatura, id_sensor, id_leitura)
+[x] Escrita FIFO
+
+    Atuadores
+[x] Cada atuador lê os valores do sensor de mesmo id a cada 2 segundos
+[x] Se as 5 últimas leituras indicarem temperatura acima de 35 graus, emite alerta vermelho
+[x] Se entre as 15 últimas, 5 indicarem temperatura acima de 35 graus, emite alerta amarelo
+[x] Caso contrário, emite alerta de condição normal.
+[x] Calcular a temperatura média de todas leituras disponíveis e exibir na tela.
+
+    Aplicação
+[ ] Executar por tempo indeterminado
+[x] Quantidade de sensores deve ser passada como argumento
+
+
