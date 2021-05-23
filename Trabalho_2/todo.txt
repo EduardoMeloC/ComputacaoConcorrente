@@ -1,6 +1,6 @@
     TAD
 [x] Implementação de leitor/escritor com prioridade para escrita
-[ ] Teste para avaliar a corretude
+[x] Teste para avaliar a corretude
 
     Sensores
 [x] Criar função de medir temperatura gerando número aleatório entre [25, 40]
@@ -17,6 +17,7 @@
 [x] Calcular a temperatura média de todas leituras disponíveis e exibir na tela.
 
     Aplicação
+[x] Organizar em arquivos separados
 [x] Executar por tempo indeterminado
 [x] Quantidade de sensores deve ser passada como argumento
 

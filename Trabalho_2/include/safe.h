@@ -1,6 +1,16 @@
+/* 
+ * safe.h
+ *
+ * Este arquivo define funções para alocação de memória e criação de threads que já
+ * imprimem mensagem de erro no caso de não obter sucesso
+ *
+ */
+
 #ifndef SAFE_H
 #define SAFE_H
 
+#include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 void* safe_malloc(size_t size);

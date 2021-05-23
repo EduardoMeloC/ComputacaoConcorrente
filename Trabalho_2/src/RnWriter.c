@@ -77,7 +77,7 @@ void RnWriter_release_write(RnWriter *rnwriter)
 {
     RnWriter *this = rnwriter; // Syntax Sugar
 
-    pthread_mutex_lock(&this->_mutex);;
+    pthread_mutex_lock(&this->_mutex);
     this->_nWriting--;
     pthread_cond_signal(&this->_cond_write);
     pthread_cond_broadcast(&this->_cond_read);

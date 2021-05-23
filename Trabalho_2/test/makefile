@@ -1,10 +1,9 @@
 CC		:= gcc
 CFLAGS	:= -Wall
 LDFLAGS := -lpthread
-SRC		:= src/*.c
-INC		:= -I include
-BINDIR  := bin
-TARGET  := $(BINDIR)/main.out
+SRC		:= $(filter-out ../src/main.c ../src/RnWriter.c, $(wildcard ../src/*.c)) ./*.c
+INC		:= -I ../include
+TARGET  := test.out
 
 .PHONY: all clean
 
@@ -14,4 +13,4 @@ main.out:
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) $(SRC) -o $(TARGET)
 
 clean:
-	rm -rf bin/*.o bin/*.out
+	rm -rf *.o *.out
