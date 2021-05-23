@@ -38,6 +38,14 @@ int main(int argc, char* argv[])
         safe_pthread_create(&actuator_tids[i], NULL, Actuator_thread, (void*)&actuators[i]);
     }
 
+    /* Imprime o LofBuffer na saída de 1 em 1 segundo */
+#ifdef VERBOSE
+    while(1){
+        LogBuffer_print(log_buffer);
+        sleep(1);
+    }
+#endif
+
     /* Esperando Threads Terminarem (do jeito que está, o programa roda indefinidamente) */
     for(int i = 0; i < nsensors; i++){
         safe_pthread_join(sensor_tids[i], NULL);
