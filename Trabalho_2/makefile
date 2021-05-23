@@ -11,9 +11,11 @@ TARGET  := $(BINDIR)/main.out
 all: main.out verbose.out
 
 main.out:
+	@ mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) $(SRC) -o $(TARGET)
 
 verbose.out:
+	@ mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INC) $(SRC) -DVERBOSE -o $(BINDIR)/verbose.out
 
 clean:
